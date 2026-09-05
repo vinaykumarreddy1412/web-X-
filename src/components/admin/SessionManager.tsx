@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { Session, SessionStatus } from '../../types';
 import { useAttendance } from '../../context/AttendanceContext';
 import { exportSessionAttendanceToExcel } from '../../services/exportService';
+import { formatTo12Hour, formatTimeRange } from '../../utils/timeFormatter';
 import { GlassCard } from '../common/GlassCard';
 import { Modal } from '../common/Modal';
 import { ConfirmDialog } from '../common/ConfirmDialog';
@@ -273,7 +274,7 @@ export const SessionManager: React.FC = () => {
                 </span>
                 <span className="flex items-center space-x-1">
                   <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{sess.startTime} - {sess.endTime}</span>
+                  <span>{formatTimeRange(sess.startTime, sess.endTime)}</span>
                 </span>
               </div>
 
@@ -461,23 +462,37 @@ export const SessionManager: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Start Time</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase">Start Time</label>
+                {startTime && (
+                  <span className="text-[10px] font-black font-mono text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                    {formatTo12Hour(startTime)}
+                  </span>
+                )}
+              </div>
               <input
                 type="time"
                 required
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">End Time</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase">End Time</label>
+                {endTime && (
+                  <span className="text-[10px] font-black font-mono text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                    {formatTo12Hour(endTime)}
+                  </span>
+                )}
+              </div>
               <input
                 type="time"
                 required
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white"
               />
             </div>
           </div>

@@ -6,6 +6,7 @@ import { TeamMemberList } from './TeamMemberList';
 import { StudentThemeAudio } from './StudentThemeAudio';
 import { TeamPickerModal } from './TeamPickerModal';
 import { GlassCard } from '../common/GlassCard';
+import { formatTimeRange } from '../../utils/timeFormatter';
 import { Calendar, Radio, Clock, Users, Search } from 'lucide-react';
 import type { Team } from '../../types';
 
@@ -175,7 +176,7 @@ export const StudentDashboard: React.FC = () => {
                     >
                       <div>
                         <p className="text-xs font-black text-slate-900">{sess.sessionName}</p>
-                        <p className="text-[10px] font-semibold text-slate-500">{sess.date} • {sess.startTime} - {sess.endTime}</p>
+                        <p className="text-[10px] font-semibold text-slate-500">{sess.date} • {formatTimeRange(sess.startTime, sess.endTime)}</p>
                       </div>
 
                       <div>

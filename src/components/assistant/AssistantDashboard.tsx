@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAttendance } from '../../context/AttendanceContext';
 import { fetchTeamByQRToken, fetchTeamByLeadRegNo, fetchTeamByNumber } from '../../services/firebaseService';
 import { parseQRTokenPayload } from '../../utils/qrGenerator';
+import { formatTimeRange } from '../../utils/timeFormatter';
 import { QRScannerModal } from './QRScannerModal';
 import { ManualSearch } from './ManualSearch';
 import { MarkAttendanceModal } from './MarkAttendanceModal';
@@ -145,7 +146,7 @@ export const AssistantDashboard: React.FC = () => {
               )}
               {assignedSession && (
                 <p className="text-xs text-slate-300 font-medium mt-0.5">
-                  {assignedSession.date} • {assignedSession.startTime} - {assignedSession.endTime}
+                  {assignedSession.date} • {formatTimeRange(assignedSession.startTime, assignedSession.endTime)}
                 </p>
               )}
             </div>

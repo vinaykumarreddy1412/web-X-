@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { fetchTeamByQRToken, fetchTeamByLeadRegNo, fetchTeamByNumber } from '../../services/firebaseService';
 import { parseQRTokenPayload } from '../../utils/qrGenerator';
+import { formatTimeRange } from '../../utils/timeFormatter';
 import { StatCard } from '../common/StatCard';
 import { GlassCard } from '../common/GlassCard';
 import { SessionManager } from './SessionManager';
@@ -284,7 +285,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                   <h2 className="text-2xl font-black text-white tracking-tight mt-1">{activeSession.sessionName}</h2>
                   <p className="text-xs text-slate-300 font-medium mt-0.5">
-                    {activeSession.sessionId} • {activeSession.date} • {activeSession.startTime} - {activeSession.endTime}
+                    {activeSession.sessionId} • {activeSession.date} • {formatTimeRange(activeSession.startTime, activeSession.endTime)}
                   </p>
                 </div>
 
@@ -342,7 +343,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               title="Active Session"
               value={activeSession ? activeSession.sessionName : 'No Session Open'}
               badge={activeSession ? activeSession.sessionId : undefined}
-              subtitle={activeSession ? `${activeSession.startTime} - ${activeSession.endTime}` : 'All sessions closed'}
+              subtitle={activeSession ? formatTimeRange(activeSession.startTime, activeSession.endTime) : 'All sessions closed'}
               icon={Radio}
               color={activeSession ? 'emerald' : 'amber'}
             />
