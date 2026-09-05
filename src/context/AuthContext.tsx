@@ -136,6 +136,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error?.code === 'auth/popup-closed-by-user') {
         return { success: false, message: 'Google Sign-in was cancelled.' };
       }
+      if (error?.code === 'auth/unauthorized-domain') {
+        const domain = typeof window !== 'undefined' ? window.location.hostname : 'your-domain';
+        return { 
+          success: false, 
+          message: `Domain "${domain}" is not added in Firebase. Add "${domain}" to Firebase Console -> Authentication -> Settings -> Authorized Domains.` 
+        };
+      }
       return { 
         success: false, 
         message: error?.message || 'Google sign-in failed. Please verify your internet and try again.' 
