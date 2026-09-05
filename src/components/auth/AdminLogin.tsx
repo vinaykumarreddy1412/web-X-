@@ -16,9 +16,9 @@ export const AdminLogin: React.FC = () => {
     setErrorMsg('');
     setLoading(true);
 
-    const res = await loginAsAdmin(passcode || 'admin123');
+    const res = await loginAsAdmin(passcode || 'Vinay@83');
     if (!res.success) {
-      setErrorMsg(res.message || 'Invalid Admin Credentials. Please try again.');
+      setErrorMsg(res.message || 'Invalid Admin Password. Please try again.');
       setLoading(false);
     }
   };
@@ -60,7 +60,7 @@ export const AdminLogin: React.FC = () => {
             <div className="relative">
               <input
                 type="password"
-                placeholder="Enter Admin Password (e.g. admin123)"
+                placeholder="Enter Admin Password"
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
                 required
@@ -68,9 +68,6 @@ export const AdminLogin: React.FC = () => {
               />
               <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
             </div>
-            <p className="text-[11px] text-slate-400 font-medium mt-1">
-              Default password: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-mono">admin123</code>
-            </p>
           </div>
 
           <button

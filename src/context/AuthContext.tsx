@@ -261,13 +261,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginAsAdmin = async (passcode: string) => {
-    if (passcode.trim() !== 'admin123' && passcode.trim() !== 'webxadmin') {
-      return { success: false, message: 'Invalid Admin Credentials.' };
+    if (passcode.trim() !== 'Vinay@83' && passcode.trim() !== 'admin123') {
+      return { success: false, message: 'Invalid Admin Password.' };
     }
 
     const adminUser: AuthUser = {
       role: 'admin',
-      username: 'Web X Lead Admin',
+      username: 'Web X Lead Admin (Vinay)',
       email: 'admin@webx.hackathon'
     };
 
