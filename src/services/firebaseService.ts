@@ -301,3 +301,36 @@ export const seedAllDemoData = async () => {
 
   return { teamsCount: demoTeams.length, sessionsCount: demoSessions.length, attendanceCount: demoAttendance.length };
 };
+
+const LOCAL_ASSISTANT_PASS_KEY = 'webx_assistant_passcode';
+const DEFAULT_ASSISTANT_PASS = 'webx2026';
+
+export const fetchAssistantPasscode = async (): Promise<string> => {
+  try {
+    const docRef = doc(db, 'settings', 'assistant_config');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists() && docSnap.data().assistantKey) {
+      const code = docSnap.data().assistantKey as string;
+      setLocal(LOCAL_ASSISTANT_PASS_KEY, code);
+      return code;
+    }
+  } catch (err) {
+    console.warn('Firestore fetch assistant passcode fallback:', err);
+  }
+  return getLocal<string>(LOCAL_ASSISTANT_PASS_KEY, DEFAULT_ASSISTANT_PASS);
+};
+
+export const saveAssistantPasscode = async (newKey: string): Promise<void> => {
+  const cleanKey = newKey.trim();
+  setLocal(LOCAL_ASSISTANT_PASS_KEY, cleanKey);
+  try {
+    await setDoc(doc(db, 'settings', 'assistant_config'), {
+      assistantKey: cleanKey,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+    await logAuditEvent('ASSISTANT_PASSCODE_UPDATED', 'Admin', 'admin', `Admin regenerated/updated Assistant Key to: ${cleanKey}`);
+  } catch (err) {
+    console.warn('Firestore save assistant passcode fallback:', err);
+  }
+};
+

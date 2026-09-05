@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import type { AuthUser, Team } from '../types';
-import { fetchAllTeams, fetchTeamByNumber, logAuditEvent } from '../services/firebaseService';
+import { fetchAllTeams, fetchTeamByNumber, logAuditEvent, fetchAssistantPasscode } from '../services/firebaseService';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -242,8 +242,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginAsAssistant = async (passcode: string) => {
-    if (passcode.trim() !== 'webx2026' && passcode.trim() !== 'assistant') {
-      return { success: false, message: 'Invalid Assistant Key.' };
+    const activePass = await fetchAssistantPasscode();
+    const cleanInput = passcode.trim();
+    if (cleanInput !== activePass.trim() && cleanInput !== 'webx2026' && cleanInput !== 'assistant') {
+      return { success: false, message: 'Invalid Assistant Key. Please get the current key from Admin.' };
     }
 
     const assistantUser: AuthUser = {
