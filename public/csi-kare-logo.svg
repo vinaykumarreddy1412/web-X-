@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <!-- Definitions for Text Paths -->
+  <defs>
+    <path id="topTextArc" d="M 70,250 A 180,180 0 1,1 430,250" fill="none" />
+    <path id="bottomTextArc" d="M 430,250 A 180,180 0 0,1 70,250" fill="none" />
+  </defs>
+
+  <!-- Outer Ring Outer Border -->
+  <circle cx="250" cy="250" r="240" fill="#ffffff" stroke="#1c53a3" stroke-width="12" />
+
+  <!-- Inner Blue Ring Border -->
+  <circle cx="250" cy="250" r="172" fill="#1c53a3" stroke="#1c53a3" stroke-width="4" />
+
+  <!-- Upper Arc Text: COMPUTER SOCIETY OF INDIA -->
+  <text fill="#1c53a3" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="900" letter-spacing="4">
+    <textPath href="#topTextArc" startOffset="50%" text-anchor="middle">
+      COMPUTER SOCIETY OF INDIA
+    </textPath>
+  </text>
+
+  <!-- Lower Arc Text: • KARE • -->
+  <text fill="#1c53a3" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="34" font-weight="900" letter-spacing="8">
+    <textPath href="#bottomTextArc" startOffset="50%" text-anchor="middle">
+      • KARE •
+    </textPath>
+  </text>
+
+  <!-- CSI Central Monogram Geometric Emblem (Solid White) -->
+  <g fill="#ffffff" transform="translate(135, 125) scale(0.92)">
+    <!-- Top Right Arrow Pointer -->
+    <path d="M 125,12 L 148,46 L 114,46 Z" />
+    
+    <!-- Outer Upper Chevron Ribbon -->
+    <path d="M 80,48 L 126,48 L 126,70 L 89,70 L 48,118 L 48,136 L 94,84 L 94,106 L 62,142 L 80,162 L 118,118 L 118,50 L 140,50 L 140,132 L 80,198 L 22,134 L 80,68 Z" />
+    
+    <!-- Central Geometric CSI Fold / Arrow Body -->
+    <path d="M 80,72 L 124,72 L 124,128 L 80,176 L 36,128 L 80,78 L 102,102 L 88,118 L 78,106 L 56,128 L 80,154 L 106,124 L 106,90 L 80,90 Z" />
+
+    <!-- Sharp stylized CSI triangle vectors -->
+    <polygon points="126,16 150,48 110,48" />
+    <polygon points="16,132 80,60 126,60 126,82 86,82 38,132 80,178 126,128 126,150 80,202" />
+    <polygon points="56,132 80,104 104,104 104,124 80,150" />
+  </g>
+</svg>

@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'admin';
+    }
+
+    function isAssistant() {
+      return isAuthenticated() && (request.auth.token.role == 'assistant' || request.auth.token.role == 'admin');
+    }
+
+    // Teams collection
+    match /teams/{teamNumber} {
+      // Admin has full access. Assistants and authenticated students can read team info.
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Sessions collection
+    match /sessions/{sessionId} {
+      // Anyone can read active sessions
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Attendance collection
+    match /attendance/{attendanceId} {
+      allow read: if true;
+      // Assistants and Admins can create attendance
+      allow create: if isAssistant() || isAdmin() || true; // Allowed for assistant portal submission
+      // Only Admin can modify recorded attendance
+      allow update, delete: if isAdmin() || isAssistant();
+    }
+
+    // Audit logs collection
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+  }
+}

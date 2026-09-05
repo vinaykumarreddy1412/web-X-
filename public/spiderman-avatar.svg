@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3B82F6" stop-opacity="0.3"/>
+      <stop offset="70%" stop-color="#EC4899" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="suitRed" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#EF4444"/>
+      <stop offset="100%" stop-color="#B91C1C"/>
+    </linearGradient>
+    <linearGradient id="suitBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Aura Splash -->
+  <circle cx="100" cy="100" r="95" fill="url(#bgGlow)"/>
+
+  <!-- Shoulders / Torso -->
+  <!-- Blue Shoulder Accents -->
+  <path d="M30 180 C30 145 60 130 75 125 L100 150 L125 125 C140 130 170 145 170 180 Z" fill="url(#suitBlue)"/>
+  
+  <!-- Red Chest & Neck -->
+  <path d="M65 140 C75 125 85 118 100 118 C115 118 125 125 135 140 L115 180 L85 180 Z" fill="url(#suitRed)"/>
+  
+  <!-- Chest Web Lines & Small Spider -->
+  <path d="M100 118 L100 180 M80 130 L120 130 M70 150 L130 150 M75 168 L125 168" stroke="#0f172a" stroke-width="1.5" stroke-linecap="round"/>
+  <ellipse cx="100" cy="148" rx="3.5" ry="4.5" fill="#0f172a"/>
+  <!-- Small spider legs -->
+  <path d="M97 146 Q90 142 88 138 M97 148 Q90 148 87 150 M103 146 Q110 142 112 138 M103 148 Q110 148 113 150" stroke="#0f172a" stroke-width="1.2" stroke-linecap="round"/>
+
+  <!-- Neck -->
+  <path d="M85 95 L85 122 C90 125 110 125 115 122 L115 95 Z" fill="url(#suitRed)"/>
+
+  <!-- Mask Head Base -->
+  <ellipse cx="100" cy="78" rx="42" ry="50" fill="url(#suitRed)"/>
+
+  <!-- Mask Web Lines -->
+  <g stroke="#0f172a" stroke-width="1.5" stroke-linecap="round" opacity="0.85">
+    <!-- Vertical Radial Lines -->
+    <path d="M100 28 L100 128"/>
+    <path d="M100 78 L65 42"/>
+    <path d="M100 78 L135 42"/>
+    <path d="M100 78 L60 78"/>
+    <path d="M100 78 L140 78"/>
+    <path d="M100 78 L65 114"/>
+    <path d="M100 78 L135 114"/>
+    
+    <!-- Concentric Web Rings -->
+    <path d="M80 50 Q100 42 120 50 Q130 78 120 106 Q100 114 80 106 Q70 78 80 50" fill="none"/>
+    <path d="M88 62 Q100 56 112 62 Q118 78 112 94 Q100 100 88 94 Q82 78 88 62" fill="none"/>
+  </g>
+
+  <!-- Iconic Spiderman Eyes (Black Outlines + White Glowing Center) -->
+  <!-- Left Eye -->
+  <path d="M68 62 C74 54 90 68 94 82 C88 88 74 86 68 76 C65 71 66 65 68 62 Z" fill="#0f172a"/>
+  <path d="M71 65 C76 58 88 70 91 80 C86 85 76 83 71 75 C69 71 70 67 71 65 Z" fill="#FFFFFF"/>
+  <path d="M74 68 C78 64 85 72 87 78" stroke="#E2E8F0" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Right Eye -->
+  <path d="M132 62 C126 54 110 68 106 82 C112 88 126 86 132 76 C135 71 134 65 132 62 Z" fill="#0f172a"/>
+  <path d="M129 65 C124 58 112 70 109 80 C114 85 124 83 129 75 C131 71 130 67 129 65 Z" fill="#FFFFFF"/>
+  <path d="M126 68 C122 64 115 72 113 78" stroke="#E2E8F0" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
