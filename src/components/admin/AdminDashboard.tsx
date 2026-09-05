@@ -10,7 +10,6 @@ import { AttendanceManager } from './AttendanceManager';
 import { ReportsView } from './ReportsView';
 import { AuditLogViewer } from './AuditLogViewer';
 import { SeedDataButton } from './SeedDataButton';
-import { AssistantPasscodeManager } from './AssistantPasscodeManager';
 import { QRScannerModal } from '../assistant/QRScannerModal';
 import { ManualSearch } from '../assistant/ManualSearch';
 import { MarkAttendanceModal } from '../assistant/MarkAttendanceModal';
@@ -374,8 +373,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <SessionManager />
             <TeamManager />
           </div>
-
-          <AssistantPasscodeManager />
         </div>
       )}
 

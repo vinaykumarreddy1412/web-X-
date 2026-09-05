@@ -302,35 +302,104 @@ export const seedAllDemoData = async () => {
   return { teamsCount: demoTeams.length, sessionsCount: demoSessions.length, attendanceCount: demoAttendance.length };
 };
 
-const LOCAL_ASSISTANT_PASS_KEY = 'webx_assistant_passcode';
-const DEFAULT_ASSISTANT_PASS = 'webx2026';
-
-export const fetchAssistantPasscode = async (): Promise<string> => {
-  try {
-    const docRef = doc(db, 'settings', 'assistant_config');
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists() && docSnap.data().assistantKey) {
-      const code = docSnap.data().assistantKey as string;
-      setLocal(LOCAL_ASSISTANT_PASS_KEY, code);
-      return code;
-    }
-  } catch (err) {
-    console.warn('Firestore fetch assistant passcode fallback:', err);
+export const validateAssistantKey = async (key: string): Promise<{
+  success: boolean;
+  session?: Session;
+  message?: string;
+  isClosed?: boolean;
+}> => {
+  const cleanKey = (key || '').trim().toUpperCase();
+  if (!cleanKey) {
+    return { success: false, message: 'Please enter an Assistant Access Key.' };
   }
-  return getLocal<string>(LOCAL_ASSISTANT_PASS_KEY, DEFAULT_ASSISTANT_PASS);
+
+  const sessions = await fetchAllSessions();
+  const matchedSession = sessions.find(s => (s.assistantKey || '').trim().toUpperCase() === cleanKey);
+
+  if (!matchedSession) {
+    return { success: false, message: 'Invalid Assistant Access Key' };
+  }
+
+  if (matchedSession.status !== 'active') {
+    return { 
+      success: false, 
+      isClosed: true, 
+      session: matchedSession,
+      message: 'This attendance session is closed.' 
+    };
+  }
+
+  return {
+    success: true,
+    session: matchedSession
+  };
 };
 
-export const saveAssistantPasscode = async (newKey: string): Promise<void> => {
+export const updateSessionAssistantKey = async (
+  sessionId: string, 
+  newKey: string
+): Promise<{ success: boolean; message?: string }> => {
   const cleanKey = newKey.trim();
-  setLocal(LOCAL_ASSISTANT_PASS_KEY, cleanKey);
-  try {
-    await setDoc(doc(db, 'settings', 'assistant_config'), {
-      assistantKey: cleanKey,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-    await logAuditEvent('ASSISTANT_PASSCODE_UPDATED', 'Admin', 'admin', `Admin regenerated/updated Assistant Key to: ${cleanKey}`);
-  } catch (err) {
-    console.warn('Firestore save assistant passcode fallback:', err);
+  if (!cleanKey) {
+    return { success: false, message: 'Assistant Access Key cannot be empty.' };
   }
+
+  const sessions = await fetchAllSessions();
+  const target = sessions.find(s => s.sessionId === sessionId);
+  if (!target) {
+    return { success: false, message: 'Session not found.' };
+  }
+
+  // Ensure uniqueness among active sessions
+  if (target.status === 'active') {
+    const conflict = sessions.find(
+      s => s.sessionId !== sessionId && 
+           s.status === 'active' && 
+           (s.assistantKey || '').trim().toUpperCase() === cleanKey.toUpperCase()
+    );
+    if (conflict) {
+      return { 
+        success: false, 
+        message: `The key "${cleanKey}" is already assigned to active session "${conflict.sessionName}". Each active session must have a unique key.` 
+      };
+    }
+  }
+
+  const prevKey = target.assistantKey || 'None';
+  target.assistantKey = cleanKey;
+  await saveSession(target);
+
+  await logAuditEvent(
+    'UPDATE_SESSION_KEY',
+    'Admin',
+    'admin',
+    `Updated Assistant Key for session "${target.sessionName}" (${sessionId}): [${prevKey}] -> [${cleanKey}]`
+  );
+
+  return { success: true };
 };
+
+export const revokeSessionAssistantKey = async (
+  sessionId: string
+): Promise<{ success: boolean; message?: string }> => {
+  const sessions = await fetchAllSessions();
+  const target = sessions.find(s => s.sessionId === sessionId);
+  if (!target) {
+    return { success: false, message: 'Session not found.' };
+  }
+
+  const prevKey = target.assistantKey || 'None';
+  target.assistantKey = '';
+  await saveSession(target);
+
+  await logAuditEvent(
+    'REVOKE_SESSION_KEY',
+    'Admin',
+    'admin',
+    `Revoked Assistant Key for session "${target.sessionName}" (${sessionId}). (Previous key: ${prevKey})`
+  );
+
+  return { success: true };
+};
+
 

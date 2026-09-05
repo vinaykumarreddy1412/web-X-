@@ -3,7 +3,7 @@ import type { Team, Session, AttendanceRecord, AuditLog } from '../types';
 import { 
   fetchAllTeams, fetchAllSessions, fetchAllAttendance, fetchAuditLogs, 
   saveAttendanceRecord, updateSessionStatus, saveSession, saveTeam, deleteTeam, bulkSaveTeams,
-  deleteSession as deleteSessionService,
+  deleteSession as deleteSessionService, updateSessionAssistantKey, revokeSessionAssistantKey,
   logAuditEvent, seedAllDemoData 
 } from '../services/firebaseService';
 
@@ -17,7 +17,9 @@ interface AttendanceContextType {
   refreshData: () => Promise<void>;
   markTeamAttendance: (sessionId: string, teamNumber: string, membersStatus: { name: string; regNo: string; status: 'present' | 'absent' }[], markedBy: string) => Promise<{ success: boolean; isDuplicate?: boolean; message?: string }>;
   adminUpdateAttendance: (sessionId: string, teamNumber: string, regNo: string, newStatus: 'present' | 'absent', updatedBy: string) => Promise<void>;
-  createOrUpdateSession: (session: Session) => Promise<void>;
+  createOrUpdateSession: (session: Session) => Promise<{ success: boolean; message?: string }>;
+  changeSessionKey: (sessionId: string, newKey: string) => Promise<{ success: boolean; message?: string }>;
+  revokeSessionKey: (sessionId: string) => Promise<{ success: boolean; message?: string }>;
   setSessionStatus: (sessionId: string, status: Session['status']) => Promise<void>;
   removeSession: (sessionId: string) => Promise<void>;
   createOrUpdateTeam: (team: Team) => Promise<void>;
@@ -67,6 +69,15 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     membersStatus: { name: string; regNo: string; status: 'present' | 'absent' }[],
     markedBy: string
   ) => {
+    // Session isolation check: ensure session is active
+    const targetSession = sessions.find(s => s.sessionId === sessionId);
+    if (!targetSession || targetSession.status !== 'active') {
+      return { 
+        success: false, 
+        message: 'Cannot record attendance: This attendance session is currently closed or inactive.' 
+      };
+    }
+
     const existing = attendanceRecords.find(r => r.sessionId === sessionId && r.teamNumber === teamNumber);
     if (existing) {
       return { success: false, isDuplicate: true, message: `Attendance for Team ${teamNumber} in this session has already been recorded.` };
@@ -140,10 +151,47 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     await loadAll();
   };
 
-  const createOrUpdateSession = async (session: Session) => {
-    await saveSession(session);
-    await logAuditEvent('SAVE_SESSION', session.createdBy, 'admin', `Saved session ${session.sessionId} - ${session.sessionName}`);
+  const createOrUpdateSession = async (session: Session): Promise<{ success: boolean; message?: string }> => {
+    const key = (session.assistantKey || '').trim().toUpperCase();
+    if (!key) {
+      return { success: false, message: 'Assistant Access Key is required.' };
+    }
+
+    // Uniqueness validation among active sessions
+    if (session.status === 'active') {
+      const conflict = sessions.find(
+        s => s.sessionId !== session.sessionId && 
+             s.status === 'active' && 
+             (s.assistantKey || '').trim().toUpperCase() === key
+      );
+      if (conflict) {
+        return { 
+          success: false, 
+          message: `The key "${key}" is already assigned to active session "${conflict.sessionName}". Each active session must have a unique key.` 
+        };
+      }
+    }
+
+    await saveSession({ ...session, assistantKey: key });
+    await logAuditEvent('SAVE_SESSION', session.createdBy, 'admin', `Saved session ${session.sessionId} - ${session.sessionName} (Key: ${key})`);
     await loadAll();
+    return { success: true };
+  };
+
+  const changeSessionKey = async (sessionId: string, newKey: string): Promise<{ success: boolean; message?: string }> => {
+    const res = await updateSessionAssistantKey(sessionId, newKey);
+    if (res.success) {
+      await loadAll();
+    }
+    return res;
+  };
+
+  const revokeSessionKey = async (sessionId: string): Promise<{ success: boolean; message?: string }> => {
+    const res = await revokeSessionAssistantKey(sessionId);
+    if (res.success) {
+      await loadAll();
+    }
+    return res;
   };
 
   const setSessionStatus = async (sessionId: string, status: Session['status']) => {
@@ -194,6 +242,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       markTeamAttendance,
       adminUpdateAttendance,
       createOrUpdateSession,
+      changeSessionKey,
+      revokeSessionKey,
       setSessionStatus,
       removeSession,
       createOrUpdateTeam,

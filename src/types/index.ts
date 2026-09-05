@@ -29,6 +29,7 @@ export interface Session {
   status: SessionStatus;
   createdAt: string;
   createdBy: string;
+  assistantKey: string;
 }
 
 export type AttendanceStatus = 'present' | 'absent';
@@ -70,4 +71,7 @@ export interface AuthUser {
   username?: string;
   email?: string;
   uid?: string;
+  assignedSessionId?: string;
+  assignedSessionName?: string;
+  assistantKey?: string;
 }

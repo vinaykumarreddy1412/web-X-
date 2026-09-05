@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from '../config/firebase';
-import type { AuthUser, Team } from '../types';
-import { fetchAllTeams, fetchTeamByNumber, logAuditEvent, fetchAssistantPasscode } from '../services/firebaseService';
+import type { AuthUser, Team, Session } from '../types';
+import { fetchAllTeams, fetchTeamByNumber, logAuditEvent, validateAssistantKey } from '../services/firebaseService';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -10,7 +10,7 @@ interface AuthContextType {
   loading: boolean;
   loginWithGoogleStudent: () => Promise<{ success: boolean; message?: string }>;
   loginWithStudentEmail: (emailOrReg: string) => Promise<{ success: boolean; message?: string }>;
-  loginAsAssistant: (passcode: string) => Promise<{ success: boolean; message?: string }>;
+  loginAsAssistant: (passcode: string) => Promise<{ success: boolean; message?: string; session?: Session }>;
   loginAsAdmin: (passcode: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
   refreshTeamData: () => Promise<void>;
@@ -241,25 +241,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginAsAssistant = async (passcode: string) => {
-    const activePass = await fetchAssistantPasscode();
-    const cleanInput = passcode.trim();
-    if (cleanInput !== activePass.trim() && cleanInput !== 'webx2026' && cleanInput !== 'assistant') {
-      return { success: false, message: 'Invalid Assistant Key. Please get the current key from Admin.' };
+  const loginAsAssistant = async (passcode: string): Promise<{ success: boolean; message?: string; session?: Session }> => {
+    const res = await validateAssistantKey(passcode);
+    if (!res.success || !res.session) {
+      return { 
+        success: false, 
+        message: res.message || 'Invalid Assistant Access Key' 
+      };
     }
 
     const assistantUser: AuthUser = {
       role: 'assistant',
-      username: 'Attendance Assistant',
-      email: 'assistant@webx.hackathon'
+      username: `Assistant (${res.session.sessionName})`,
+      email: 'assistant@webx.hackathon',
+      assignedSessionId: res.session.sessionId,
+      assignedSessionName: res.session.sessionName,
+      assistantKey: res.session.assistantKey
     };
 
     setUser(assistantUser);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(assistantUser));
 
-    logAuditEvent('ASSISTANT_LOGIN', 'Assistant', 'assistant', 'Assistant logged into Assistant Portal');
+    await logAuditEvent(
+      'ASSISTANT_LOGIN', 
+      'Assistant', 
+      'assistant', 
+      `Assistant authenticated with key "${res.session.assistantKey}" for session "${res.session.sessionName}" (${res.session.sessionId})`
+    );
 
-    return { success: true };
+    return { 
+      success: true, 
+      session: res.session,
+      message: `Access Granted. Session: ${res.session.sessionName}` 
+    };
   };
 
   const loginAsAdmin = async (passcode: string) => {

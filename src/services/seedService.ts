@@ -85,7 +85,8 @@ export const generateDefaultSessions = (): Session[] => {
       description: 'Grand opening ceremony, dataset release, and hackathon guidelines.',
       status: 'closed',
       createdAt: new Date().toISOString(),
-      createdBy: 'Admin'
+      createdBy: 'Admin',
+      assistantKey: 'WEBX-INAU-01'
     },
     {
       sessionId: 'SESSION002',
@@ -96,7 +97,8 @@ export const generateDefaultSessions = (): Session[] => {
       description: 'First milestone evaluation and attendance audit.',
       status: 'active',
       createdAt: new Date().toISOString(),
-      createdBy: 'Admin'
+      createdBy: 'Admin',
+      assistantKey: 'WEBXDAY1'
     },
     {
       sessionId: 'SESSION003',
@@ -107,7 +109,8 @@ export const generateDefaultSessions = (): Session[] => {
       description: 'Night coding round mandatory attendance check.',
       status: 'draft',
       createdAt: new Date().toISOString(),
-      createdBy: 'Admin'
+      createdBy: 'Admin',
+      assistantKey: 'WEBX-NIGHT-03'
     },
     {
       sessionId: 'SESSION004',
@@ -118,7 +121,8 @@ export const generateDefaultSessions = (): Session[] => {
       description: 'Jury presentation and final hackathon evaluation.',
       status: 'draft',
       createdAt: new Date().toISOString(),
-      createdBy: 'Admin'
+      createdBy: 'Admin',
+      assistantKey: 'WEBX-FINAL-04'
     }
   ];
 };
