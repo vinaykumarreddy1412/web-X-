@@ -1,49 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAttendance } from '../../context/AttendanceContext';
 import { QRCodeDisplay } from './QRCodeDisplay';
 import { TeamMemberList } from './TeamMemberList';
 import { StudentThemeAudio } from './StudentThemeAudio';
-import { TeamPickerModal } from './TeamPickerModal';
 import { GlassCard } from '../common/GlassCard';
 import { formatTimeRange } from '../../utils/timeFormatter';
-import { Calendar, Radio, Clock, Users, Search } from 'lucide-react';
-import type { Team } from '../../types';
-
-const STUDENT_TEAM_STORAGE_KEY = 'webx_student_team_number';
+import { Calendar, Radio, Clock, Users } from 'lucide-react';
 
 export const StudentDashboard: React.FC = () => {
   const { currentTeam: authTeam } = useAuth();
   const { activeSession, sessions, attendanceRecords, teams, loading: teamsLoading } = useAttendance();
-  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
 
-  useEffect(() => {
-    if (authTeam) {
-      setSelectedTeam(authTeam);
-      return;
-    }
-
-    if (teams && teams.length > 0) {
-      const savedTeamNum = localStorage.getItem(STUDENT_TEAM_STORAGE_KEY);
-      if (savedTeamNum) {
-        const found = teams.find(t => t.teamNumber?.toUpperCase() === savedTeamNum.toUpperCase());
-        if (found) {
-          setSelectedTeam(found);
-          return;
-        }
-      }
-      // Default to first registered team
-      setSelectedTeam(teams[0]);
-    }
-  }, [authTeam, teams]);
-
-  const handleSelectTeam = (team: Team) => {
-    setSelectedTeam(team);
-    localStorage.setItem(STUDENT_TEAM_STORAGE_KEY, team.teamNumber);
-  };
-
-  const currentTeam = selectedTeam || authTeam;
+  const currentTeam = authTeam || (teams && teams.length > 0 ? teams[0] : null);
 
   if (teamsLoading && !currentTeam) {
     return (
@@ -59,24 +28,11 @@ export const StudentDashboard: React.FC = () => {
       <div className="p-8 text-center max-w-md mx-auto">
         <GlassCard glowAccent="red" className="space-y-4">
           <Users className="w-10 h-10 text-red-500 mx-auto" />
-          <h3 className="text-lg font-black text-slate-900">Select Your Hackathon Team</h3>
+          <h3 className="text-lg font-black text-slate-900">No Team Found</h3>
           <p className="text-xs text-slate-500 font-medium">
-            Search your team by Team Number or Team Lead Registration Number to view your QR code.
+            Your university account is not registered with any hackathon team. Please contact the administrator.
           </p>
-          <button
-            onClick={() => setPickerOpen(true)}
-            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs rounded-xl shadow-md"
-          >
-            Find My Team
-          </button>
         </GlassCard>
-        <TeamPickerModal
-          isOpen={pickerOpen}
-          onClose={() => setPickerOpen(false)}
-          teams={teams}
-          selectedTeamNumber=""
-          onSelectTeam={handleSelectTeam}
-        />
       </div>
     );
   }
@@ -96,14 +52,6 @@ export const StudentDashboard: React.FC = () => {
                 {currentTeam.teamNumber}
               </span>
               <h2 className="text-2xl font-black text-white tracking-tight">{currentTeam.teamName}</h2>
-              <button
-                onClick={() => setPickerOpen(true)}
-                className="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-bold border border-slate-700 transition-all flex items-center space-x-1"
-                title="Switch Team"
-              >
-                <Search className="w-3 h-3 text-red-400" />
-                <span>Switch Team</span>
-              </button>
             </div>
             <p className="text-xs font-semibold text-slate-300 mt-1 flex items-center space-x-2">
               <span>Team Lead: <strong>{currentTeam.teamLeadName}</strong> ({currentTeam.teamLeadRegNo})</span>
@@ -205,14 +153,6 @@ export const StudentDashboard: React.FC = () => {
         </div>
 
       </div>
-
-      <TeamPickerModal
-        isOpen={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        teams={teams}
-        selectedTeamNumber={currentTeam.teamNumber}
-        onSelectTeam={handleSelectTeam}
-      />
 
     </div>
   );
