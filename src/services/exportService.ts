@@ -1,12 +1,14 @@
 import ExcelJS from 'exceljs';
 import type { Team, Session, AttendanceRecord } from '../types';
 import { formatTo12Hour, formatTimeRange } from '../utils/timeFormatter';
+import { sortTeamsNaturally } from './firebaseService';
 
 export const exportSessionAttendanceToExcel = async (
   session: Session,
   teams: Team[],
   attendanceRecords: AttendanceRecord[]
 ) => {
+  const sortedTeams = sortTeamsNaturally(teams);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Web X Attendance System';
   workbook.created = new Date();
@@ -61,7 +63,7 @@ export const exportSessionAttendanceToExcel = async (
   const sessionTimeFormatted = formatTimeRange(session.startTime, session.endTime) || formatTo12Hour(session.startTime) || '';
 
   // Populate data rows for each team and its members
-  teams.forEach(team => {
+  sortedTeams.forEach(team => {
     const record = recordMap.get(`${session.sessionId}_${team.teamNumber}`);
     const memberMap = new Map<string, string>();
     if (record) {
@@ -144,6 +146,7 @@ export const exportTeamSummaryToExcel = async (
   sessions: Session[],
   attendanceRecords: AttendanceRecord[]
 ) => {
+  const sortedTeams = sortTeamsNaturally(teams);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Web X Attendance System';
   workbook.created = new Date();
@@ -187,7 +190,7 @@ export const exportTeamSummaryToExcel = async (
   const recordMap = new Map<string, AttendanceRecord>();
   attendanceRecords.forEach(r => recordMap.set(`${r.sessionId}_${r.teamNumber}`, r));
 
-  teams.forEach(team => {
+  sortedTeams.forEach(team => {
     team.members.forEach(member => {
       const rowData: Record<string, any> = {
         teamNo: team.teamNumber,

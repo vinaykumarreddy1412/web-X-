@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Team, TeamMember } from '../../types';
 import { useAttendance } from '../../context/AttendanceContext';
 import { generateSecureQRToken } from '../../utils/qrGenerator';
@@ -29,13 +29,20 @@ export const TeamManager: React.FC = () => {
     { name: '', regNo: '', role: 'Member' }
   ]);
 
-  const filteredTeams = teams.filter(t => 
-    t.teamNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.teamName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.teamLeadRegNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.teamLeadName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.members.some(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()) || m.regNo.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredTeams = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    const list = teams.filter(t => 
+      t.teamNumber.toLowerCase().includes(q) ||
+      t.teamName.toLowerCase().includes(q) ||
+      t.teamLeadRegNo.toLowerCase().includes(q) ||
+      t.teamLeadName.toLowerCase().includes(q) ||
+      t.members.some(m => m.name.toLowerCase().includes(q) || m.regNo.toLowerCase().includes(q))
+    );
+
+    return [...list].sort((a, b) => 
+      (a.teamNumber || '').localeCompare(b.teamNumber || '', undefined, { numeric: true, sensitivity: 'base' })
+    );
+  }, [teams, searchQuery]);
 
   const openAddModal = () => {
     setEditingTeam(null);

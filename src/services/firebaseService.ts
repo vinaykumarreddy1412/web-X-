@@ -41,14 +41,24 @@ const sessionsByIdMap = new Map<string, Session>();
 let cachedAttendance: AttendanceRecord[] | null = null;
 const attendanceByIdMap = new Map<string, AttendanceRecord>();
 
+export const sortTeamsNaturally = (teamList: Team[]): Team[] => {
+  return [...teamList].sort((a, b) => {
+    return (a.teamNumber || '').localeCompare(b.teamNumber || '', undefined, { 
+      numeric: true, 
+      sensitivity: 'base' 
+    });
+  });
+};
+
 const indexTeams = (teams: Team[]) => {
-  cachedTeams = teams;
+  const sorted = sortTeamsNaturally(teams);
+  cachedTeams = sorted;
   teamsByNumberMap.clear();
   teamsByQRTokenMap.clear();
   teamsByLeadRegNoMap.clear();
   teamsByMemberRegNoMap.clear();
 
-  teams.forEach(t => {
+  sorted.forEach(t => {
     if (t.teamNumber) {
       teamsByNumberMap.set(t.teamNumber.toUpperCase().trim(), t);
       teamsByNumberMap.set(t.teamNumber.toUpperCase().replace(/[\s-_]/g, ''), t);
