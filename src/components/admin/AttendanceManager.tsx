@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { GlassCard } from '../common/GlassCard';
 import { Search, CheckCircle2, XCircle, Clock } from 'lucide-react';
@@ -11,62 +11,67 @@ export const AttendanceManager: React.FC = () => {
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const allFlattenedRecords: Array<{
-    sessionId: string;
-    sessionName: string;
-    teamNumber: string;
-    teamName: string;
-    regNo: string;
-    studentName: string;
-    role: string;
-    status: 'present' | 'absent' | 'Not Marked';
-    markedAt?: string;
-  }> = [];
+  const allFlattenedRecords = useMemo(() => {
+    const list: Array<{
+      sessionId: string;
+      sessionName: string;
+      teamNumber: string;
+      teamName: string;
+      regNo: string;
+      studentName: string;
+      role: string;
+      status: 'present' | 'absent' | 'Not Marked';
+      markedAt?: string;
+    }> = [];
 
-  const recordMap = new Map<string, any>();
-  attendanceRecords.forEach(r => recordMap.set(`${r.sessionId}_${r.teamNumber}`, r));
+    const recordMap = new Map<string, any>();
+    attendanceRecords.forEach(r => recordMap.set(`${r.sessionId}_${r.teamNumber}`, r));
 
-  const targetSessions = selectedSessionId === 'all' 
-    ? sessions 
-    : sessions.filter(s => s.sessionId === selectedSessionId);
+    const targetSessions = selectedSessionId === 'all' 
+      ? sessions 
+      : sessions.filter(s => s.sessionId === selectedSessionId);
 
-  targetSessions.forEach(sess => {
-    teams.forEach(team => {
-      const record = recordMap.get(`${sess.sessionId}_${team.teamNumber}`);
-      const memberStatusMap = new Map<string, 'present' | 'absent'>();
-      if (record) {
-        record.members.forEach((m: any) => memberStatusMap.set(m.regNo, m.status));
-      }
+    const q = searchQuery.toLowerCase().trim();
 
-      team.members.forEach(m => {
-        const status = record ? (memberStatusMap.get(m.regNo) || 'absent') : 'Not Marked';
-
-        if (selectedStatusFilter !== 'all' && status !== selectedStatusFilter) return;
-
-        if (searchQuery) {
-          const q = searchQuery.toLowerCase();
-          const match = team.teamNumber.toLowerCase().includes(q) ||
-            team.teamName.toLowerCase().includes(q) ||
-            m.name.toLowerCase().includes(q) ||
-            m.regNo.toLowerCase().includes(q) ||
-            sess.sessionName.toLowerCase().includes(q);
-          if (!match) return;
+    targetSessions.forEach(sess => {
+      teams.forEach(team => {
+        const record = recordMap.get(`${sess.sessionId}_${team.teamNumber}`);
+        const memberStatusMap = new Map<string, 'present' | 'absent'>();
+        if (record) {
+          record.members.forEach((m: any) => memberStatusMap.set(m.regNo, m.status));
         }
 
-        allFlattenedRecords.push({
-          sessionId: sess.sessionId,
-          sessionName: sess.sessionName,
-          teamNumber: team.teamNumber,
-          teamName: team.teamName,
-          regNo: m.regNo,
-          studentName: m.name,
-          role: m.role,
-          status,
-          markedAt: record?.markedAt
+        team.members.forEach(m => {
+          const status = record ? (memberStatusMap.get(m.regNo) || 'absent') : 'Not Marked';
+
+          if (selectedStatusFilter !== 'all' && status !== selectedStatusFilter) return;
+
+          if (q) {
+            const match = team.teamNumber.toLowerCase().includes(q) ||
+              team.teamName.toLowerCase().includes(q) ||
+              m.name.toLowerCase().includes(q) ||
+              m.regNo.toLowerCase().includes(q) ||
+              sess.sessionName.toLowerCase().includes(q);
+            if (!match) return;
+          }
+
+          list.push({
+            sessionId: sess.sessionId,
+            sessionName: sess.sessionName,
+            teamNumber: team.teamNumber,
+            teamName: team.teamName,
+            regNo: m.regNo,
+            studentName: m.name,
+            role: m.role,
+            status,
+            markedAt: record?.markedAt
+          });
         });
       });
     });
-  });
+
+    return list;
+  }, [teams, sessions, attendanceRecords, selectedSessionId, selectedStatusFilter, searchQuery]);
 
   const handleToggleStatus = async (item: typeof allFlattenedRecords[0]) => {
     const newStatus: AttendanceStatus = item.status === 'present' ? 'absent' : 'present';

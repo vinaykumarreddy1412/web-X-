@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import type { Team, Session, AttendanceRecord, AuditLog } from '../types';
 import { 
   fetchAllTeams, fetchAllSessions, fetchAllAttendance, fetchAuditLogs, 
@@ -37,13 +39,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const loadAll = async () => {
-    setLoading(true);
+  // Initial fast hydration from indexed cache and Firestore
+  const loadAll = useCallback(async () => {
     try {
       const [tData, sData, aData, logData] = await Promise.all([
-        fetchAllTeams(),
-        fetchAllSessions(),
-        fetchAllAttendance(),
+        fetchAllTeams(true),
+        fetchAllSessions(true),
+        fetchAllAttendance(true),
         fetchAuditLogs()
       ]);
       setTeams(tData);
@@ -55,21 +57,60 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadAll();
   }, []);
 
-  const activeSession = sessions.find(s => s.status === 'active') || null;
+  useEffect(() => {
+    // Initial load
+    loadAll();
 
+    // Clean Real-Time Listeners with proper unmount cleanup to avoid duplicate reads
+    let unsubAttendance: (() => void) | null = null;
+    let unsubSessions: (() => void) | null = null;
+
+    try {
+      unsubAttendance = onSnapshot(collection(db, 'attendance'), (snapshot) => {
+        if (!snapshot.empty) {
+          const records: AttendanceRecord[] = [];
+          snapshot.forEach(doc => {
+            records.push({ id: doc.id, ...doc.data() } as AttendanceRecord);
+          });
+          setAttendanceRecords(records);
+        }
+      }, (err) => {
+        console.warn('Attendance live snapshot fallback:', err);
+      });
+
+      unsubSessions = onSnapshot(collection(db, 'sessions'), (snapshot) => {
+        if (!snapshot.empty) {
+          const sessList: Session[] = [];
+          snapshot.forEach(doc => {
+            sessList.push(doc.data() as Session);
+          });
+          setSessions(sessList);
+        }
+      }, (err) => {
+        console.warn('Sessions live snapshot fallback:', err);
+      });
+    } catch (e) {
+      console.warn('Snapshot listener setup fallback:', e);
+    }
+
+    return () => {
+      if (unsubAttendance) unsubAttendance();
+      if (unsubSessions) unsubSessions();
+    };
+  }, [loadAll]);
+
+  const activeSession = useMemo(() => sessions.find(s => s.status === 'active') || null, [sessions]);
+
+  // High-performance attendance write: optimistic + atomic + zero full reloads
   const markTeamAttendance = async (
     sessionId: string,
     teamNumber: string,
     membersStatus: { name: string; regNo: string; status: 'present' | 'absent' }[],
     markedBy: string
   ) => {
-    // Session isolation check: ensure session is active
+    // 1. Session status check
     const targetSession = sessions.find(s => s.sessionId === sessionId);
     if (!targetSession || targetSession.status !== 'active') {
       return { 
@@ -78,13 +119,20 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       };
     }
 
-    const existing = attendanceRecords.find(r => r.sessionId === sessionId && r.teamNumber === teamNumber);
+    // 2. Duplicate prevention check
+    const recordId = `${sessionId}_${teamNumber}`;
+    const existing = attendanceRecords.find(r => (r.id || `${r.sessionId}_${r.teamNumber}`) === recordId);
     if (existing) {
-      return { success: false, isDuplicate: true, message: `Attendance for Team ${teamNumber} in this session has already been recorded.` };
+      return { 
+        success: false, 
+        isDuplicate: true, 
+        message: `Attendance for Team ${teamNumber} in this session has already been recorded.` 
+      };
     }
 
+    // 3. Construct atomic record
     const record: AttendanceRecord = {
-      id: `${sessionId}_${teamNumber}`,
+      id: recordId,
       sessionId,
       teamNumber,
       markedAt: new Date().toISOString(),
@@ -92,9 +140,17 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       members: membersStatus
     };
 
+    // 4. Optimistic state update (Instant 0ms UI feedback)
+    setAttendanceRecords(prev => {
+      const filtered = prev.filter(r => (r.id || `${r.sessionId}_${r.teamNumber}`) !== recordId);
+      return [record, ...filtered];
+    });
+
+    // 5. Persist to Firestore & Local IndexedDB
     await saveAttendanceRecord(record);
-    await logAuditEvent('MARK_ATTENDANCE', markedBy, 'assistant', `Marked attendance for Team ${teamNumber} in Session ${sessionId}`);
-    await loadAll();
+
+    // 6. Non-blocking audit log
+    logAuditEvent('MARK_ATTENDANCE', markedBy, 'assistant', `Marked attendance for Team ${teamNumber} in Session ${sessionId}`);
 
     return { success: true };
   };
@@ -106,7 +162,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     newStatus: 'present' | 'absent',
     updatedBy: string
   ) => {
-    let record = attendanceRecords.find(r => r.sessionId === sessionId && r.teamNumber === teamNumber);
+    const recordId = `${sessionId}_${teamNumber}`;
+    let record = attendanceRecords.find(r => (r.id || `${r.sessionId}_${r.teamNumber}`) === recordId);
 
     if (!record) {
       const team = teams.find(t => t.teamNumber === teamNumber);
@@ -119,7 +176,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }));
 
       record = {
-        id: `${sessionId}_${teamNumber}`,
+        id: recordId,
         sessionId,
         teamNumber,
         markedAt: new Date().toISOString(),
@@ -139,7 +196,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         editedBy: updatedBy
       };
 
-      await logAuditEvent(
+      logAuditEvent(
         'EDIT_ATTENDANCE',
         updatedBy,
         'admin',
@@ -147,8 +204,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       );
     }
 
-    await saveAttendanceRecord(record);
-    await loadAll();
+    const finalRecord = record;
+    setAttendanceRecords(prev => {
+      const filtered = prev.filter(r => (r.id || `${r.sessionId}_${r.teamNumber}`) !== recordId);
+      return [finalRecord, ...filtered];
+    });
+
+    await saveAttendanceRecord(finalRecord);
   };
 
   const createOrUpdateSession = async (session: Session): Promise<{ success: boolean; message?: string }> => {
@@ -172,16 +234,22 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     }
 
-    await saveSession({ ...session, assistantKey: key });
-    await logAuditEvent('SAVE_SESSION', session.createdBy, 'admin', `Saved session ${session.sessionId} - ${session.sessionName} (Key: ${key})`);
-    await loadAll();
+    const updatedSession = { ...session, assistantKey: key };
+    setSessions(prev => {
+      const filtered = prev.filter(s => s.sessionId !== session.sessionId);
+      return [...filtered, updatedSession];
+    });
+
+    await saveSession(updatedSession);
+    logAuditEvent('SAVE_SESSION', session.createdBy, 'admin', `Saved session ${session.sessionId} - ${session.sessionName} (Key: ${key})`);
     return { success: true };
   };
 
   const changeSessionKey = async (sessionId: string, newKey: string): Promise<{ success: boolean; message?: string }> => {
     const res = await updateSessionAssistantKey(sessionId, newKey);
     if (res.success) {
-      await loadAll();
+      const updatedSessions = await fetchAllSessions(true);
+      setSessions(updatedSessions);
     }
     return res;
   };
@@ -189,39 +257,45 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const revokeSessionKey = async (sessionId: string): Promise<{ success: boolean; message?: string }> => {
     const res = await revokeSessionAssistantKey(sessionId);
     if (res.success) {
-      await loadAll();
+      const updatedSessions = await fetchAllSessions(true);
+      setSessions(updatedSessions);
     }
     return res;
   };
 
   const setSessionStatus = async (sessionId: string, status: Session['status']) => {
     await updateSessionStatus(sessionId, status);
-    await logAuditEvent('CHANGE_SESSION_STATUS', 'Admin', 'admin', `Changed status of session ${sessionId} to ${status}`);
-    await loadAll();
+    logAuditEvent('CHANGE_SESSION_STATUS', 'Admin', 'admin', `Changed status of session ${sessionId} to ${status}`);
+    const updatedSessions = await fetchAllSessions(true);
+    setSessions(updatedSessions);
   };
 
   const removeSession = async (sessionId: string) => {
     await deleteSessionService(sessionId);
-    await logAuditEvent('DELETE_SESSION', 'Admin', 'admin', `Deleted session ${sessionId}`);
-    await loadAll();
+    logAuditEvent('DELETE_SESSION', 'Admin', 'admin', `Deleted session ${sessionId}`);
+    setSessions(prev => prev.filter(s => s.sessionId !== sessionId));
   };
 
   const createOrUpdateTeam = async (team: Team) => {
     await saveTeam(team);
-    await logAuditEvent('SAVE_TEAM', 'Admin', 'admin', `Saved team ${team.teamNumber} - ${team.teamName}`);
-    await loadAll();
+    logAuditEvent('SAVE_TEAM', 'Admin', 'admin', `Saved team ${team.teamNumber} - ${team.teamName}`);
+    setTeams(prev => {
+      const filtered = prev.filter(t => t.teamNumber !== team.teamNumber);
+      return [...filtered, team];
+    });
   };
 
   const removeTeam = async (teamNumber: string) => {
     await deleteTeam(teamNumber);
-    await logAuditEvent('DELETE_TEAM', 'Admin', 'admin', `Deleted team ${teamNumber}`);
-    await loadAll();
+    logAuditEvent('DELETE_TEAM', 'Admin', 'admin', `Deleted team ${teamNumber}`);
+    setTeams(prev => prev.filter(t => t.teamNumber !== teamNumber));
   };
 
   const importTeamsFromCSV = async (newTeams: Team[]) => {
     await bulkSaveTeams(newTeams);
-    await logAuditEvent('IMPORT_TEAMS_CSV', 'Admin', 'admin', `Imported ${newTeams.length} teams from CSV file.`);
-    await loadAll();
+    logAuditEvent('IMPORT_TEAMS_CSV', 'Admin', 'admin', `Imported ${newTeams.length} teams from CSV file.`);
+    const updatedTeams = await fetchAllTeams(true);
+    setTeams(updatedTeams);
   };
 
   const seedDemoData = async () => {

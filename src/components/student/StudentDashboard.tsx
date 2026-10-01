@@ -37,10 +37,6 @@ export const StudentDashboard: React.FC = () => {
     );
   }
 
-  const activeRecord = activeSession 
-    ? attendanceRecords.find(r => r.sessionId === activeSession.sessionId && r.teamNumber === currentTeam.teamNumber)
-    : null;
-
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       
@@ -96,8 +92,6 @@ export const StudentDashboard: React.FC = () => {
           <TeamMemberList
             teamNumber={currentTeam.teamNumber}
             members={currentTeam.members}
-            attendanceMembers={activeRecord?.members}
-            activeSessionName={activeSession?.sessionName}
           />
 
           <GlassCard glowAccent="cyan" className="w-full">

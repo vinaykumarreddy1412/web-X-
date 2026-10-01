@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import type { Team, Session, AttendanceRecord } from '../types';
+import { formatTo12Hour, formatTimeRange } from '../utils/timeFormatter';
 
 export const exportSessionAttendanceToExcel = async (
   session: Session,
@@ -14,17 +15,21 @@ export const exportSessionAttendanceToExcel = async (
     views: [{ showGridLines: true }]
   });
 
-  // Define Columns exactly as requested: Team No, Team Name, Student Name, Status
+  // Define Columns: Date, Session Name, Time, Team No, Team Name, Student Name, Registration No, Status
   worksheet.columns = [
+    { header: 'Date', key: 'date', width: 16 },
+    { header: 'Session Name', key: 'sessionName', width: 24 },
+    { header: 'Time', key: 'time', width: 24 },
     { header: 'Team No', key: 'teamNo', width: 16 },
     { header: 'Team Name', key: 'teamName', width: 28 },
     { header: 'Student Name', key: 'studentName', width: 28 },
+    { header: 'Registration No', key: 'regNo', width: 18 },
     { header: 'Status', key: 'status', width: 18 }
   ];
 
   // Style Header Row
   const headerRow = worksheet.getRow(1);
-  headerRow.height = 28;
+  headerRow.height = 30;
   headerRow.eachCell((cell) => {
     cell.fill = {
       type: 'pattern',
@@ -39,7 +44,8 @@ export const exportSessionAttendanceToExcel = async (
     };
     cell.alignment = {
       vertical: 'middle',
-      horizontal: 'center'
+      horizontal: 'center',
+      wrapText: true
     };
     cell.border = {
       top: { style: 'thin', color: { argb: 'FF334155' } },
@@ -52,7 +58,9 @@ export const exportSessionAttendanceToExcel = async (
   const recordMap = new Map<string, AttendanceRecord>();
   attendanceRecords.forEach(r => recordMap.set(`${r.sessionId}_${r.teamNumber}`, r));
 
-  // Populate data rows for each team and its 4 members
+  const sessionTimeFormatted = formatTimeRange(session.startTime, session.endTime) || formatTo12Hour(session.startTime) || '';
+
+  // Populate data rows for each team and its members
   teams.forEach(team => {
     const record = recordMap.get(`${session.sessionId}_${team.teamNumber}`);
     const memberMap = new Map<string, string>();
@@ -67,20 +75,28 @@ export const exportSessionAttendanceToExcel = async (
       const displayStatus = isPresent ? 'PRESENT' : 'ABSENT';
 
       const row = worksheet.addRow({
+        date: session.date || '',
+        sessionName: session.sessionName || '',
+        time: sessionTimeFormatted,
         teamNo: team.teamNumber,
         teamName: team.teamName,
         studentName: member.name,
+        regNo: member.regNo || '',
         status: displayStatus
       });
 
       row.height = 22;
 
       // Style standard cells
+      row.getCell('date').alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell('sessionName').alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell('time').alignment = { vertical: 'middle', horizontal: 'center' };
       row.getCell('teamNo').alignment = { vertical: 'middle', horizontal: 'center' };
       row.getCell('teamNo').font = { bold: true };
 
       row.getCell('teamName').alignment = { vertical: 'middle', horizontal: 'left' };
       row.getCell('studentName').alignment = { vertical: 'middle', horizontal: 'left' };
+      row.getCell('regNo').alignment = { vertical: 'middle', horizontal: 'center' };
 
       // Apply Green color for PRESENT, Red color for ABSENT
       const statusCell = row.getCell('status');
@@ -139,17 +155,20 @@ export const exportTeamSummaryToExcel = async (
   const columns: any[] = [
     { header: 'Team No', key: 'teamNo', width: 16 },
     { header: 'Team Name', key: 'teamName', width: 28 },
-    { header: 'Student Name', key: 'studentName', width: 28 }
+    { header: 'Student Name', key: 'studentName', width: 28 },
+    { header: 'Registration No', key: 'regNo', width: 18 }
   ];
 
   sessions.forEach((s) => {
-    columns.push({ header: s.sessionName, key: s.sessionId, width: 22 });
+    const timeDisplay = formatTimeRange(s.startTime, s.endTime) || formatTo12Hour(s.startTime);
+    const headerTitle = s.date && timeDisplay ? `${s.sessionName}\n(${s.date} | ${timeDisplay})` : s.sessionName;
+    columns.push({ header: headerTitle, key: s.sessionId, width: 26 });
   });
 
   worksheet.columns = columns;
 
   const headerRow = worksheet.getRow(1);
-  headerRow.height = 28;
+  headerRow.height = 32;
   headerRow.eachCell((cell) => {
     cell.fill = {
       type: 'pattern',
@@ -162,7 +181,7 @@ export const exportTeamSummaryToExcel = async (
       bold: true,
       color: { argb: 'FFFFFFFF' }
     };
-    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
   });
 
   const recordMap = new Map<string, AttendanceRecord>();
@@ -173,7 +192,8 @@ export const exportTeamSummaryToExcel = async (
       const rowData: Record<string, any> = {
         teamNo: team.teamNumber,
         teamName: team.teamName,
-        studentName: member.name
+        studentName: member.name,
+        regNo: member.regNo || ''
       };
 
       sessions.forEach(sess => {
@@ -193,6 +213,7 @@ export const exportTeamSummaryToExcel = async (
       row.getCell('teamNo').font = { bold: true };
       row.getCell('teamName').alignment = { vertical: 'middle', horizontal: 'left' };
       row.getCell('studentName').alignment = { vertical: 'middle', horizontal: 'left' };
+      row.getCell('regNo').alignment = { vertical: 'middle', horizontal: 'center' };
 
       sessions.forEach(sess => {
         const cell = row.getCell(sess.sessionId);

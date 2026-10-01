@@ -1,6 +1,11 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager, 
+  getFirestore 
+} from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAIYJ6qPQ1T2cGFp7D4_Y3I04TWCpjDN0E",
@@ -12,9 +17,20 @@ const firebaseConfig = {
   measurementId: "G-R79SYLJ36B"
 };
 
-// Initialize Firebase
+// Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
-const db = getFirestore(app);
+
+// Initialize Firestore with Persistent IndexedDB multi-tab cache
+let db: ReturnType<typeof getFirestore>;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  });
+} catch {
+  db = getFirestore(app);
+}
 
 export { app, auth, db };

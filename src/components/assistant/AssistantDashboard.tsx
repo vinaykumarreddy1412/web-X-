@@ -14,7 +14,7 @@ import { QrCode, Search, Radio, CheckCircle2, AlertCircle, ShieldAlert } from 'l
 
 export const AssistantDashboard: React.FC = () => {
   const { user } = useAuth();
-  const { sessions, markTeamAttendance, attendanceRecords } = useAttendance();
+  const { sessions, teams, markTeamAttendance, attendanceRecords } = useAttendance();
 
   // Strict session resolution from authenticated assistant user
   const assignedSession = sessions.find(s => s.sessionId === user?.assignedSessionId) || null;
@@ -46,14 +46,25 @@ export const AssistantDashboard: React.FC = () => {
     const parsed = parseQRTokenPayload(scannedPayload);
     let team: Team | null = null;
 
+    // 1. Instant $O(1)$ memory check from context teams
     if (parsed.isValid && parsed.qrToken) {
-      team = await fetchTeamByQRToken(parsed.qrToken);
+      team = teams.find(t => t.qrToken === parsed.qrToken) || null;
+    }
+    if (!team && parsed.teamNumber) {
+      const pNum = parsed.teamNumber.toUpperCase();
+      team = teams.find(t => t.teamNumber.toUpperCase() === pNum) || null;
+    }
+    if (!team) {
+      team = teams.find(t => t.qrToken === scannedPayload.trim()) || null;
     }
 
+    // 2. Fallback to service indexed cache
+    if (!team && parsed.isValid && parsed.qrToken) {
+      team = await fetchTeamByQRToken(parsed.qrToken);
+    }
     if (!team && parsed.teamNumber) {
       team = await fetchTeamByNumber(parsed.teamNumber);
     }
-
     if (!team) {
       team = await fetchTeamByQRToken(scannedPayload);
     }
@@ -77,10 +88,21 @@ export const AssistantDashboard: React.FC = () => {
 
     setErrorToast(null);
     setLoading(true);
+    const cleanQuery = query.trim().toUpperCase();
     let team: Team | null = null;
 
-    team = await fetchTeamByLeadRegNo(query);
+    // 1. Instant in-memory check
+    team = teams.find(t => 
+      t.teamLeadRegNo?.trim().toUpperCase() === cleanQuery ||
+      t.teamNumber.toUpperCase() === cleanQuery ||
+      t.teamNumber.toUpperCase().replace(/[\s-_]/g, '') === cleanQuery.replace(/[\s-_]/g, '') ||
+      (t.members && t.members.some(m => m.regNo?.trim().toUpperCase() === cleanQuery))
+    ) || null;
 
+    // 2. Fallback to service
+    if (!team) {
+      team = await fetchTeamByLeadRegNo(query);
+    }
     if (!team) {
       team = await fetchTeamByNumber(query);
     }
@@ -122,6 +144,10 @@ export const AssistantDashboard: React.FC = () => {
     setMarkModalOpen(false);
     setSuccessModalOpen(true);
   };
+
+  const isSelectedTeamAlreadyMarked = selectedTeam && assignedSession
+    ? attendanceRecords.some(r => r.sessionId === assignedSession.sessionId && r.teamNumber === selectedTeam.teamNumber)
+    : false;
 
   const activeRecordsForSession = assignedSession 
     ? attendanceRecords.filter(r => r.sessionId === assignedSession.sessionId)
@@ -281,6 +307,7 @@ export const AssistantDashboard: React.FC = () => {
           team={selectedTeam}
           activeSession={assignedSession}
           onSave={handleSaveAttendance}
+          isDuplicate={isSelectedTeamAlreadyMarked}
         />
       )}
 

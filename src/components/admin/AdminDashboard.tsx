@@ -10,7 +10,6 @@ import { TeamManager } from './TeamManager';
 import { AttendanceManager } from './AttendanceManager';
 import { ReportsView } from './ReportsView';
 import { AuditLogViewer } from './AuditLogViewer';
-import { SeedDataButton } from './SeedDataButton';
 import { QRScannerModal } from '../assistant/QRScannerModal';
 import { ManualSearch } from '../assistant/ManualSearch';
 import { MarkAttendanceModal } from '../assistant/MarkAttendanceModal';
@@ -76,14 +75,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const parsed = parseQRTokenPayload(scannedPayload);
     let team: Team | null = null;
 
+    // 1. Instant in-memory check
     if (parsed.isValid && parsed.qrToken) {
-      team = await fetchTeamByQRToken(parsed.qrToken);
+      team = teams.find(t => t.qrToken === parsed.qrToken) || null;
+    }
+    if (!team && parsed.teamNumber) {
+      const pNum = parsed.teamNumber.toUpperCase();
+      team = teams.find(t => t.teamNumber.toUpperCase() === pNum) || null;
+    }
+    if (!team) {
+      team = teams.find(t => t.qrToken === scannedPayload.trim()) || null;
     }
 
+    // 2. Service fallback
+    if (!team && parsed.isValid && parsed.qrToken) {
+      team = await fetchTeamByQRToken(parsed.qrToken);
+    }
     if (!team && parsed.teamNumber) {
       team = await fetchTeamByNumber(parsed.teamNumber);
     }
-
     if (!team) {
       team = await fetchTeamByQRToken(scannedPayload);
     }
@@ -102,10 +112,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleManualSearch = async (query: string) => {
     setErrorToast(null);
     setLoading(true);
+    const cleanQuery = query.trim().toUpperCase();
     let team: Team | null = null;
 
-    team = await fetchTeamByLeadRegNo(query);
+    // 1. Instant in-memory check
+    team = teams.find(t => 
+      t.teamLeadRegNo?.trim().toUpperCase() === cleanQuery ||
+      t.teamNumber.toUpperCase() === cleanQuery ||
+      t.teamNumber.toUpperCase().replace(/[\s-_]/g, '') === cleanQuery.replace(/[\s-_]/g, '') ||
+      (t.members && t.members.some(m => m.regNo?.trim().toUpperCase() === cleanQuery))
+    ) || null;
 
+    // 2. Service fallback
+    if (!team) {
+      team = await fetchTeamByLeadRegNo(query);
+    }
     if (!team) {
       team = await fetchTeamByNumber(query);
     }
@@ -265,8 +286,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <span>Audit Trail ({auditLogs.length})</span>
           </button>
         </div>
-
-        <SeedDataButton />
       </div>
 
       {(currentTab === 'overview' || currentTab === 'dashboard') && (

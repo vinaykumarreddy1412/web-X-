@@ -17,13 +17,15 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const isProcessingRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (isOpen) {
       setScannerError(null);
+      isProcessingRef.current = false;
       const timer = setTimeout(() => {
         startScanner();
-      }, 300);
+      }, 150);
       return () => {
         clearTimeout(timer);
         stopScanner();
@@ -42,11 +44,12 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         await stopScanner();
       }
 
+      isProcessingRef.current = false;
       const html5Qrcode = new Html5Qrcode('qr-reader-container');
       scannerRef.current = html5Qrcode;
 
       const config = {
-        fps: 10,
+        fps: 15,
         qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0
       };
@@ -55,6 +58,8 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         { facingMode: 'environment' },
         config,
         (decodedText) => {
+          if (isProcessingRef.current) return;
+          isProcessingRef.current = true;
           triggerScanVibration();
           stopScanner();
           onScanSuccess(decodedText);
