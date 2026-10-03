@@ -14,7 +14,7 @@ import { QrCode, Search, Radio, CheckCircle2, AlertCircle, ShieldAlert } from 'l
 
 export const AssistantDashboard: React.FC = () => {
   const { user } = useAuth();
-  const { sessions, teams, markTeamAttendance, attendanceRecords } = useAttendance();
+  const { sessions, teams, markTeamAttendance, attendanceRecords, error: dbError } = useAttendance();
 
   // Strict session resolution from authenticated assistant user
   const assignedSession = sessions.find(s => s.sessionId === user?.assignedSessionId) || null;
@@ -204,6 +204,13 @@ export const AssistantDashboard: React.FC = () => {
               Please contact the Admin to reopen this session or provide a new Assistant Access Key.
             </p>
           </div>
+        </div>
+      )}
+
+      {dbError && (
+        <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 font-bold text-xs flex items-center space-x-2">
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+          <span>{dbError}</span>
         </div>
       )}
 

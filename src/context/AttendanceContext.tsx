@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { Team, Session, AttendanceRecord, AuditLog } from '../types';
 import { 
   fetchAllTeams, fetchAllSessions, fetchAllAttendance, fetchAuditLogs, 
   saveAttendanceRecord, updateSessionStatus, saveSession, saveTeam, deleteTeam, bulkSaveTeams,
   deleteSession as deleteSessionService, updateSessionAssistantKey, revokeSessionAssistantKey,
-  logAuditEvent, seedAllDemoData 
+  logAuditEvent, seedAllDemoData, indexTeams, indexSessions, indexAttendance, sortTeamsNaturally
 } from '../services/firebaseService';
 
 interface AttendanceContextType {
@@ -16,6 +16,7 @@ interface AttendanceContextType {
   activeSession: Session | null;
   auditLogs: AuditLog[];
   loading: boolean;
+  error: string | null;
   refreshData: () => Promise<void>;
   markTeamAttendance: (sessionId: string, teamNumber: string, membersStatus: { name: string; regNo: string; status: 'present' | 'absent' }[], markedBy: string) => Promise<{ success: boolean; isDuplicate?: boolean; message?: string }>;
   adminUpdateAttendance: (sessionId: string, teamNumber: string, regNo: string, newStatus: 'present' | 'absent', updatedBy: string) => Promise<void>;
@@ -38,10 +39,12 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Initial fast hydration from indexed cache and Firestore
+  // Manual one-time revalidation fetch
   const loadAll = useCallback(async () => {
     try {
+      setError(null);
       const [tData, sData, aData, logData] = await Promise.all([
         fetchAllTeams(true),
         fetchAllSessions(true),
@@ -53,64 +56,102 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setAttendanceRecords(aData);
       setAuditLogs(logData);
     } catch (e) {
-      console.error('Failed to load attendance context data:', e);
+      console.error('Failed to load live attendance data:', e);
+      setError('Unable to load live attendance data. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Multi-Device Real-Time Firestore Synchronization
   useEffect(() => {
-    // Initial load
-    loadAll();
-
-    // Clean Real-Time Listeners with proper unmount cleanup to avoid duplicate reads
-    let unsubAttendance: (() => void) | null = null;
+    let unsubTeams: (() => void) | null = null;
     let unsubSessions: (() => void) | null = null;
+    let unsubAttendance: (() => void) | null = null;
+    let unsubLogs: (() => void) | null = null;
 
     try {
-      unsubAttendance = onSnapshot(collection(db, 'attendance'), (snapshot) => {
-        if (!snapshot.empty) {
-          const records: AttendanceRecord[] = [];
-          snapshot.forEach(doc => {
-            records.push({ id: doc.id, ...doc.data() } as AttendanceRecord);
-          });
-          setAttendanceRecords(records);
-        }
+      // 1. Live Teams Listener
+      unsubTeams = onSnapshot(collection(db, 'teams'), (snapshot) => {
+        const teamList: Team[] = [];
+        snapshot.forEach(docSnap => {
+          teamList.push(docSnap.data() as Team);
+        });
+        const sorted = sortTeamsNaturally(teamList);
+        setTeams(sorted);
+        indexTeams(sorted);
+        setLoading(false);
+        setError(null);
       }, (err) => {
-        console.warn('Attendance live snapshot fallback:', err);
+        console.error('Teams live snapshot listener error:', err);
+        setError('Unable to load live attendance data. Please check your connection and try again.');
+        setLoading(false);
       });
 
+      // 2. Live Sessions Listener
       unsubSessions = onSnapshot(collection(db, 'sessions'), (snapshot) => {
-        if (!snapshot.empty) {
-          const sessList: Session[] = [];
-          snapshot.forEach(doc => {
-            sessList.push(doc.data() as Session);
-          });
-          setSessions(sessList);
-        }
+        const sessList: Session[] = [];
+        snapshot.forEach(docSnap => {
+          sessList.push(docSnap.data() as Session);
+        });
+        setSessions(sessList);
+        indexSessions(sessList);
+        setError(null);
       }, (err) => {
-        console.warn('Sessions live snapshot fallback:', err);
+        console.error('Sessions live snapshot listener error:', err);
+        setError('Unable to load live attendance data. Please check your connection and try again.');
       });
+
+      // 3. Live Attendance Listener (Instant multi-device attendance sync)
+      unsubAttendance = onSnapshot(collection(db, 'attendance'), (snapshot) => {
+        const records: AttendanceRecord[] = [];
+        snapshot.forEach(docSnap => {
+          records.push({ id: docSnap.id, ...docSnap.data() } as AttendanceRecord);
+        });
+        setAttendanceRecords(records);
+        indexAttendance(records);
+        setError(null);
+      }, (err) => {
+        console.error('Attendance live snapshot listener error:', err);
+        setError('Unable to load live attendance data. Please check your connection and try again.');
+      });
+
+      // 4. Live Audit Logs Listener (Ordered recent 100 entries)
+      const auditQuery = query(collection(db, 'auditLogs'), orderBy('timestamp', 'desc'), limit(100));
+      unsubLogs = onSnapshot(auditQuery, (snapshot) => {
+        const logs: AuditLog[] = [];
+        snapshot.forEach(docSnap => {
+          logs.push({ id: docSnap.id, ...docSnap.data() } as AuditLog);
+        });
+        setAuditLogs(logs);
+      }, (err) => {
+        console.warn('Audit logs listener fallback:', err);
+      });
+
     } catch (e) {
-      console.warn('Snapshot listener setup fallback:', e);
+      console.error('Real-time listener setup error:', e);
+      loadAll();
     }
 
     return () => {
-      if (unsubAttendance) unsubAttendance();
+      if (unsubTeams) unsubTeams();
       if (unsubSessions) unsubSessions();
+      if (unsubAttendance) unsubAttendance();
+      if (unsubLogs) unsubLogs();
     };
   }, [loadAll]);
 
+  // Derived active session always in sync with live Firestore database
   const activeSession = useMemo(() => sessions.find(s => s.status === 'active') || null, [sessions]);
 
-  // High-performance attendance write: optimistic + atomic + zero full reloads
+  // Atomic & safe attendance write: concurrent updates from multiple assistants
   const markTeamAttendance = async (
     sessionId: string,
     teamNumber: string,
     membersStatus: { name: string; regNo: string; status: 'present' | 'absent' }[],
     markedBy: string
   ) => {
-    // 1. Session status check
+    // 1. Session status check from current live state
     const targetSession = sessions.find(s => s.sessionId === sessionId);
     if (!targetSession || targetSession.status !== 'active') {
       return { 
@@ -140,19 +181,21 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       members: membersStatus
     };
 
-    // 4. Optimistic state update (Instant 0ms UI feedback)
+    // 4. Optimistic state update (Instant UI feedback)
     setAttendanceRecords(prev => {
       const filtered = prev.filter(r => (r.id || `${r.sessionId}_${r.teamNumber}`) !== recordId);
       return [record, ...filtered];
     });
 
-    // 5. Persist to Firestore & Local IndexedDB
-    await saveAttendanceRecord(record);
-
-    // 6. Non-blocking audit log
-    logAuditEvent('MARK_ATTENDANCE', markedBy, 'assistant', `Marked attendance for Team ${teamNumber} in Session ${sessionId}`);
-
-    return { success: true };
+    // 5. Persist directly to Firestore document (atomic write)
+    try {
+      await saveAttendanceRecord(record);
+      logAuditEvent('MARK_ATTENDANCE', markedBy, 'assistant', `Marked attendance for Team ${teamNumber} in Session ${sessionId}`);
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error saving attendance record:', err);
+      return { success: false, message: 'Unable to save attendance to database. Please check your connection and try again.' };
+    }
   };
 
   const adminUpdateAttendance = async (
@@ -281,7 +324,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     logAuditEvent('SAVE_TEAM', 'Admin', 'admin', `Saved team ${team.teamNumber} - ${team.teamName}`);
     setTeams(prev => {
       const filtered = prev.filter(t => t.teamNumber !== team.teamNumber);
-      return [...filtered, team];
+      return sortTeamsNaturally([...filtered, team]);
     });
   };
 
@@ -312,6 +355,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       activeSession,
       auditLogs,
       loading,
+      error,
       refreshData: loadAll,
       markTeamAttendance,
       adminUpdateAttendance,

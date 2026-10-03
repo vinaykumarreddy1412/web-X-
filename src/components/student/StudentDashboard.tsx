@@ -6,13 +6,29 @@ import { TeamMemberList } from './TeamMemberList';
 import { StudentThemeAudio } from './StudentThemeAudio';
 import { GlassCard } from '../common/GlassCard';
 import { formatTimeRange } from '../../utils/timeFormatter';
-import { Calendar, Radio, Clock, Users } from 'lucide-react';
+import { Calendar, Radio, Clock, Users, AlertCircle } from 'lucide-react';
 
 export const StudentDashboard: React.FC = () => {
-  const { currentTeam: authTeam } = useAuth();
-  const { activeSession, sessions, attendanceRecords, teams, loading: teamsLoading } = useAttendance();
+  const { user, currentTeam: authTeam } = useAuth();
+  const { activeSession, sessions, attendanceRecords, teams, loading: teamsLoading, error } = useAttendance();
 
-  const currentTeam = authTeam || (teams && teams.length > 0 ? teams[0] : null);
+  // Look up student's live team record from Firestore
+  const liveTeam = user?.teamNumber ? teams.find(t => t.teamNumber === user.teamNumber) : null;
+  const currentTeam = liveTeam || authTeam;
+
+  if (error && !currentTeam) {
+    return (
+      <div className="p-8 text-center max-w-md mx-auto">
+        <GlassCard glowAccent="red" className="space-y-4">
+          <AlertCircle className="w-10 h-10 text-red-500 mx-auto" />
+          <h3 className="text-lg font-black text-slate-900">Connection Error</h3>
+          <p className="text-xs text-slate-600 font-bold">
+            Unable to load live attendance data. Please check your connection and try again.
+          </p>
+        </GlassCard>
+      </div>
+    );
+  }
 
   if (teamsLoading && !currentTeam) {
     return (
@@ -40,6 +56,13 @@ export const StudentDashboard: React.FC = () => {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       
+      {error && (
+        <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold flex items-center space-x-2">
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+          <span>Unable to load live attendance data. Please check your connection and try again.</span>
+        </div>
+      )}
+
       <GlassCard glowAccent="blue" className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border-slate-800">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -151,4 +174,3 @@ export const StudentDashboard: React.FC = () => {
     </div>
   );
 };
-

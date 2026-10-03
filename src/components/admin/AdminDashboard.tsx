@@ -46,7 +46,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     activeSession, 
     attendanceRecords,
     auditLogs,
-    markTeamAttendance
+    markTeamAttendance,
+    error: dbError
   } = useAttendance();
 
   const [localTab, setLocalTab] = useState<'overview' | 'take-attendance' | 'sessions' | 'teams' | 'attendance' | 'reports' | 'audit'>('overview');
@@ -188,6 +189,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
       
       {/* Error Toast */}
+      {dbError && (
+        <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold flex items-center space-x-2 shadow-sm">
+          <AlertCircle className="w-5 h-5 shrink-0 text-red-600" />
+          <span>{dbError}</span>
+        </div>
+      )}
+
       {errorToast && (
         <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold flex items-center justify-between shadow-sm animate-bounce">
           <div className="flex items-center space-x-2">
