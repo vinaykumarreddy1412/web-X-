@@ -296,26 +296,26 @@ export const saveSession = async (session: Session): Promise<void> => {
 };
 
 export const updateSessionStatus = async (sessionId: string, status: Session['status']): Promise<void> => {
-  const sessions = await fetchAllSessions(true);
+  const currentSessions = cachedSessions || await fetchAllSessions();
   const batch = writeBatch(db);
 
   if (status === 'active') {
-    for (const s of sessions) {
+    for (const s of currentSessions) {
       if (s.status === 'active' && s.sessionId !== sessionId) {
         s.status = 'closed';
-        batch.set(doc(db, 'sessions', s.sessionId), s);
+        batch.set(doc(db, 'sessions', s.sessionId), s, { merge: true });
       }
     }
   }
 
-  const target = sessions.find(s => s.sessionId === sessionId);
+  const target = currentSessions.find(s => s.sessionId === sessionId);
   if (target) {
     target.status = status;
-    batch.set(doc(db, 'sessions', target.sessionId), target);
+    batch.set(doc(db, 'sessions', target.sessionId), target, { merge: true });
   }
 
+  indexSessions(currentSessions);
   await batch.commit();
-  indexSessions(sessions);
 };
 
 export const deleteSession = async (sessionId: string): Promise<void> => {

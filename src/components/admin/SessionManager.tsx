@@ -359,31 +359,29 @@ export const SessionManager: React.FC = () => {
               {/* Session Status & Admin Actions */}
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
                 <div className="flex items-center space-x-2">
-                  {sess.status !== 'active' ? (
-                    <button
-                      onClick={() => setSessionStatus(sess.sessionId, 'active')}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-sm flex items-center space-x-1"
-                    >
-                      <Play className="w-3.5 h-3.5" />
-                      <span>OPEN SESSION</span>
-                    </button>
-                  ) : (
+                  {sess.status === 'active' ? (
                     <button
                       onClick={() => setSessionStatus(sess.sessionId, 'closed')}
-                      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-sm flex items-center space-x-1"
+                      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-sm flex items-center space-x-1 transition-all active:scale-95 cursor-pointer"
                     >
                       <Square className="w-3.5 h-3.5" />
                       <span>CLOSE SESSION</span>
                     </button>
-                  )}
-
-                  {sess.status === 'closed' && (
+                  ) : sess.status === 'closed' ? (
                     <button
                       onClick={() => setSessionStatus(sess.sessionId, 'active')}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-sm inline-flex items-center space-x-1"
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-sm inline-flex items-center space-x-1 transition-all active:scale-95 cursor-pointer"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
                       <span>REOPEN</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setSessionStatus(sess.sessionId, 'active')}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-sm flex items-center space-x-1 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      <span>OPEN SESSION</span>
                     </button>
                   )}
                 </div>

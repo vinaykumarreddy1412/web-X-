@@ -307,10 +307,28 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const setSessionStatus = async (sessionId: string, status: Session['status']) => {
-    await updateSessionStatus(sessionId, status);
-    logAuditEvent('CHANGE_SESSION_STATUS', 'Admin', 'admin', `Changed status of session ${sessionId} to ${status}`);
-    const updatedSessions = await fetchAllSessions(true);
-    setSessions(updatedSessions);
+    // 1. Instant 0ms Optimistic State Update
+    setSessions(prev => {
+      const updated = prev.map(s => {
+        if (status === 'active') {
+          if (s.sessionId === sessionId) return { ...s, status: 'active' as const };
+          if (s.status === 'active') return { ...s, status: 'closed' as const };
+        } else if (s.sessionId === sessionId) {
+          return { ...s, status };
+        }
+        return s;
+      });
+      indexSessions(updated);
+      return updated;
+    });
+
+    // 2. Fast background persist to Firestore
+    try {
+      await updateSessionStatus(sessionId, status);
+      logAuditEvent('CHANGE_SESSION_STATUS', 'Admin', 'admin', `Changed status of session ${sessionId} to ${status}`);
+    } catch (err) {
+      console.error('Failed to persist session status update:', err);
+    }
   };
 
   const removeSession = async (sessionId: string) => {
