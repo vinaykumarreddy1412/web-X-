@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { Team, Session, AttendanceRecord, AuditLog } from '../types';
 import { 
@@ -44,20 +44,37 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // Manual one-time revalidation fetch
   const loadAll = useCallback(async () => {
     try {
-      setError(null);
-      const [tData, sData, aData, logData] = await Promise.all([
+      const [tData, sData, aData, logData] = await Promise.allSettled([
         fetchAllTeams(true),
         fetchAllSessions(true),
         fetchAllAttendance(true),
         fetchAuditLogs()
       ]);
-      setTeams(tData);
-      setSessions(sData);
-      setAttendanceRecords(aData);
-      setAuditLogs(logData);
+
+      let hasSuccess = false;
+      if (tData.status === 'fulfilled' && tData.value.length > 0) {
+        setTeams(tData.value);
+        indexTeams(tData.value);
+        hasSuccess = true;
+      }
+      if (sData.status === 'fulfilled') {
+        setSessions(sData.value);
+        indexSessions(sData.value);
+        if (sData.value.length > 0) hasSuccess = true;
+      }
+      if (aData.status === 'fulfilled') {
+        setAttendanceRecords(aData.value);
+        indexAttendance(aData.value);
+      }
+      if (logData.status === 'fulfilled') {
+        setAuditLogs(logData.value);
+      }
+
+      if (hasSuccess) {
+        setError(null);
+      }
     } catch (e) {
-      console.error('Failed to load live attendance data:', e);
-      setError('Unable to load live attendance data. Please check your connection and try again.');
+      console.warn('Revalidation notice:', e);
     } finally {
       setLoading(false);
     }
@@ -83,9 +100,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setLoading(false);
         setError(null);
       }, (err) => {
-        console.error('Teams live snapshot listener error:', err);
-        setError('Unable to load live attendance data. Please check your connection and try again.');
-        setLoading(false);
+        console.warn('Teams live listener warning:', err);
       });
 
       // 2. Live Sessions Listener
@@ -96,10 +111,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         });
         setSessions(sessList);
         indexSessions(sessList);
+        setLoading(false);
         setError(null);
       }, (err) => {
-        console.error('Sessions live snapshot listener error:', err);
-        setError('Unable to load live attendance data. Please check your connection and try again.');
+        console.warn('Sessions live listener warning:', err);
       });
 
       // 3. Live Attendance Listener (Instant multi-device attendance sync)
@@ -112,24 +127,22 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         indexAttendance(records);
         setError(null);
       }, (err) => {
-        console.error('Attendance live snapshot listener error:', err);
-        setError('Unable to load live attendance data. Please check your connection and try again.');
+        console.warn('Attendance live listener warning:', err);
       });
 
-      // 4. Live Audit Logs Listener (Ordered recent 100 entries)
-      const auditQuery = query(collection(db, 'auditLogs'), orderBy('timestamp', 'desc'), limit(100));
-      unsubLogs = onSnapshot(auditQuery, (snapshot) => {
+      // 4. Live Audit Logs Listener
+      unsubLogs = onSnapshot(collection(db, 'auditLogs'), (snapshot) => {
         const logs: AuditLog[] = [];
         snapshot.forEach(docSnap => {
           logs.push({ id: docSnap.id, ...docSnap.data() } as AuditLog);
         });
-        setAuditLogs(logs);
+        setAuditLogs(logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
       }, (err) => {
-        console.warn('Audit logs listener fallback:', err);
+        console.warn('Audit logs listener warning:', err);
       });
 
     } catch (e) {
-      console.error('Real-time listener setup error:', e);
+      console.warn('Real-time listener setup warning:', e);
       loadAll();
     }
 

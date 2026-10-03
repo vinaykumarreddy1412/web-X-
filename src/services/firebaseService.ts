@@ -1,6 +1,6 @@
 import { 
   collection, doc, getDocs, getDoc, setDoc, deleteDoc, 
-  query, where, writeBatch, orderBy, limit 
+  query, where, writeBatch 
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { Team, Session, AttendanceRecord, AuditLog } from '../types';
@@ -118,8 +118,7 @@ export const fetchAllTeams = async (forceRefresh = false): Promise<Team[]> => {
     return teams;
   } catch (err) {
     console.error('Firestore fetch teams error:', err);
-    if (cachedTeams) return cachedTeams;
-    throw err;
+    return cachedTeams || [];
   }
 };
 
@@ -280,8 +279,7 @@ export const fetchAllSessions = async (forceRefresh = false): Promise<Session[]>
     return sessions;
   } catch (err) {
     console.error('Firestore fetch sessions error:', err);
-    if (cachedSessions) return cachedSessions;
-    throw err;
+    return cachedSessions || [];
   }
 };
 
@@ -345,8 +343,7 @@ export const fetchAllAttendance = async (forceRefresh = false): Promise<Attendan
     return records;
   } catch (err) {
     console.error('Firestore fetch attendance error:', err);
-    if (cachedAttendance) return cachedAttendance;
-    throw err;
+    return cachedAttendance || [];
   }
 };
 
@@ -396,13 +393,12 @@ export const saveAttendanceRecord = async (record: AttendanceRecord): Promise<vo
 
 export const fetchAuditLogs = async (): Promise<AuditLog[]> => {
   try {
-    const q = query(collection(db, 'auditLogs'), orderBy('timestamp', 'desc'), limit(100));
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await getDocs(collection(db, 'auditLogs'));
     const logs: AuditLog[] = [];
     querySnapshot.forEach(docSnap => {
       logs.push({ id: docSnap.id, ...docSnap.data() } as AuditLog);
     });
-    return logs;
+    return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   } catch (err) {
     console.warn('Firestore fetch audit logs error:', err);
     return [];
